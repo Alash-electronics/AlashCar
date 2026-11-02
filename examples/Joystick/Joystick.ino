@@ -1,6 +1,14 @@
 // AlashCar: управление аналоговым джойстиком (модуль KY-023): рычаг вперёд едет вперёд, вправо поворачивает вправо,
 // по диагонали едет дугой. drive(скорость, поворот) смешивает левую и правую стороны сам.
 // Подключение джойстика: VRx -> A0 (поворот), VRy -> A1 (газ), +5 В, GND (ESP32: GPIO34 и GPIO35, питание 3.3 В). При запуске рычаг отпущен: центр определяется автоматически.
+#if defined(ARDUINO_ARCH_ESP8266)
+// У ESP8266 один аналоговый вход (A0), а джойстику нужны два: возьмите Uno, ESP32 или добавьте АЦП ADS1115 (библиотека AlashADS1115).
+void setup() {
+  Serial.begin(115200);
+  Serial.println(F("ESP8266 has one analog input; a joystick needs two. Use Uno or ESP32."));
+}
+void loop() {}
+#else
 #include <AlashCar.h>
 
 #if defined(ESP32)
@@ -38,3 +46,4 @@ void loop() {
   int speed = -axis(PIN_Y, centerY);          // знак зависит от модуля: если вперёд едет назад, уберите минус
   car.drive(speed, turn);
 }
+#endif

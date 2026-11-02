@@ -47,7 +47,11 @@ jobs:
           fail=0
           for example in $(find examples -name "*.ino"); do
             # примеры только для ESP на AVR не собираем
-            if [[ "${{ matrix.board.fqbn }}" != esp32* ]] && [[ "$example" == *ESP* ]]; then continue; fi
+            f="${{ matrix.board.fqbn }}"
+            if [[ "$f" != esp32* && "$example" == *ESP32* ]]; then continue; fi
+            if [[ "$f" != esp8266* && "$example" == *ESP8266* ]]; then continue; fi
+            if [[ "$f" != esp* && "$example" == *ESP* ]]; then continue; fi
+            if [[ "$f" != arduino:avr* && "$example" == *_AVR* ]]; then continue; fi
             echo "::group::$example"
             arduino-cli compile --fqbn ${{ matrix.board.fqbn }} "$example" || fail=1
             echo "::endgroup::"

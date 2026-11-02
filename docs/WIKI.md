@@ -42,6 +42,9 @@ void loop() {
 ```
 
 ### Что умеет
+- **Любой драйвер моторов:** L298N, L293D, TB6612 (три пина на мотор), L9110S, HG7881, DRV8833, MX1508, BTS7960 (два ШИМ-пина), Cytron (DIR и ШИМ): `AlashMotor(AlashMotor::DRIVER_PWM_PWM, 5, 6)`.
+- **2WD и 4WD:** `addLeft()` / `addRight()` добавляют второй мотор на сторону; левая и правая стороны могут быть на разных драйверах.
+- **Особенности драйверов:** `setEnablePin()` для STBY / R_EN / L_EN, `setInverted()` для оптопар, `setPwmMax()` для 10 и 12 бит ШИМ и ESP8266 с ядром 2.x (диапазон 1023).
 - **Простые команды:** `forward()`, `backward()`, `turnLeft()`, `turnRight()`, `stop()`, `brake()`; скорость от -100 до 100.
 - **Джойстик:** `drive(скорость, поворот)` смешивает левую и правую стороны, при перегрузке сам уменьшает обе пропорционально.
 - **Bluetooth:** `car.handleStream(bt)` понимает F, B, L, R, S, Y (режим RC Car приложения BLE Controller), W A S D и цифры 0-9 как скорость.
@@ -55,6 +58,9 @@ void loop() {
 ### Справочник по методам
 | Метод | Что делает |
 |---|---|
+| `AlashMotor(driver, pinA, pinB, pinC)` | Мотор и тип драйвера: IN_IN_PWM, PWM_PWM или DIR_PWM |
+| `AlashCar(left, right) / addLeft(m) / addRight(m)` | Машинка из двух моторов; второй мотор на сторону (4WD) |
+| `AlashMotor::setEnablePin(pin) / setInverted() / setPwmMax()` | Вывод EN или STBY, инверсия сигналов, максимум ШИМ |
 | `AlashCar(AlashCar::PHOBO) / AlashCar(r1,r2,re,l1,l2,le)` | Пины робота Фобо / свои пины |
 | `forward(s) backward(s) turnLeft(s) turnRight(s)` | Движение со скоростью -100..100 |
 | `stop() / brake()` | Остановка свободная / торможением |
@@ -79,11 +85,19 @@ void loop() {
 
 Включите защиту: `car.setFailsafe(1000)` и вызывайте `car.update()` в loop().
 
+**Мотор на L9110S / DRV8833 не крутится или шумит**
+
+У таких драйверов оба пина мотора управляются ШИМ: оба должны быть ШИМ-пинами платы (на Uno 3, 5, 6, 9, 10, 11). Тип драйвера `DRIVER_PWM_PWM`. Проверьте питание драйвера (3-10 В) и общий GND.
+
+**Мотор вращается вполсилы или не на полной скорости**
+
+Проверьте максимум ШИМ: у большинства плат 255, но у ESP8266 с ядром 2.x диапазон 1023, а при `analogWriteResolution(10)` или 12 бит нужно вызвать `car.setPwmMax(1023)` (или 4095). Для BTS7960 и TB6612 подайте HIGH на выводы R_EN, L_EN или STBY (`setEnablePin()`).
+
 ### Самопроверка
 В библиотеке есть `diagnose(Serial)`: она печатает, что видит плата, и подсказывает, что проверить. Язык подсказок: `setLanguage(LANG_RU / LANG_KK / LANG_EN)`.
 
 ### Примеры
-`Basic`, `Bluetooth_AVR`, `Joystick`, `Diagnose`
+`Basic`, `Bluetooth_AVR`, `Joystick`, `Diagnose`, `Driver_L9110`, `FourWheelDrive`
 
 ---
 
@@ -125,6 +139,9 @@ void loop() {
 ```
 
 ### Мүмкіндіктері
+- **Кез келген мотор драйвері:** L298N, L293D, TB6612 (мотор басына үш пин), L9110S, HG7881, DRV8833, MX1508, BTS7960 (екі ШИМ пині), Cytron (DIR және ШИМ): `AlashMotor(AlashMotor::DRIVER_PWM_PWM, 5, 6)`.
+- **2WD және 4WD:** `addLeft()` / `addRight()` жаққа екінші моторды қосады; сол және оң жақ әртүрлі драйверде болуы мүмкін.
+- **Драйвер ерекшеліктері:** STBY / R_EN / L_EN үшін `setEnablePin()`, оптопаралар үшін `setInverted()`, 10 және 12 бит ШИМ және 2.x ядролы ESP8266 (диапазон 1023) үшін `setPwmMax()`.
 - **Қарапайым командалар:** `forward()`, `backward()`, `turnLeft()`, `turnRight()`, `stop()`; жылдамдық -100...100.
 - **Джойстик:** `drive(жылдамдық, бұрылыс)`.
 - **Bluetooth:** `car.handleStream(bt)` F, B, L, R, S, Y және W A S D, 0-9 цифрларын түсінеді.
@@ -138,6 +155,9 @@ void loop() {
 ### Әдістер анықтамасы
 | Әдіс | Не істейді |
 |---|---|
+| `AlashMotor(driver, pinA, pinB, pinC)` | Мотор және драйвер түрі |
+| `AlashCar(left, right) / addLeft(m) / addRight(m)` | Екі моторлы машина |
+| `AlashMotor::setEnablePin(pin) / setInverted() / setPwmMax()` | EN шықпасы, инверсия, ШИМ максимумы |
 | `AlashCar(AlashCar::PHOBO) / AlashCar(r1,r2,re,l1,l2,le)` | Фобо пиндері / өз пиндері |
 | `forward(s) backward(s) turnLeft(s) turnRight(s)` | Қозғалыс |
 | `stop() / brake()` | Тоқтау |
@@ -162,11 +182,19 @@ void loop() {
 
 `car.setFailsafe(1000)` қосыңыз.
 
+**L9110S / DRV8833 моторы айналмайды немесе шулайды**
+
+Мұндай драйверлерде мотордың екі пині де ШИМ-мен басқарылады: екеуі де тақтаның ШИМ пиндері болуы керек (Uno-да 3, 5, 6, 9, 10, 11). Драйвер түрі `DRIVER_PWM_PWM`. Драйвер қуатын (3-10 В) және ортақ GND тексеріңіз.
+
+**Мотор жарты күшпен немесе толық жылдамдықсыз айналады**
+
+ШИМ максимумын тексеріңіз: көпшілік тақтада 255, бірақ 2.x ядролы ESP8266-да диапазон 1023, ал `analogWriteResolution(10)` немесе 12 бит болса `car.setPwmMax(1023)` (немесе 4095) шақыру керек. BTS7960 және TB6612 үшін R_EN, L_EN немесе STBY шықпаларына HIGH беріңіз (`setEnablePin()`).
+
 ### Өзін-өзі тексеру
 Кітапханада `diagnose(Serial)` бар: тақта не көргенін басып шығарады және нені тексеру керегін айтады. Кеңес тілі: `setLanguage(LANG_RU / LANG_KK / LANG_EN)`.
 
 ### Мысалдар
-`Basic`, `Bluetooth_AVR`, `Joystick`, `Diagnose`
+`Basic`, `Bluetooth_AVR`, `Joystick`, `Diagnose`, `Driver_L9110`, `FourWheelDrive`
 
 ---
 
@@ -208,6 +236,9 @@ void loop() {
 ```
 
 ### Features
+- **Any motor driver:** L298N, L293D, TB6612 (three pins per motor), L9110S, HG7881, DRV8833, MX1508, BTS7960 (two PWM pins), Cytron (DIR and PWM): `AlashMotor(AlashMotor::DRIVER_PWM_PWM, 5, 6)`.
+- **2WD and 4WD:** `addLeft()` / `addRight()` add a second motor to a side; the left and right sides can use different drivers.
+- **Driver quirks:** `setEnablePin()` for STBY / R_EN / L_EN, `setInverted()` for optocouplers, `setPwmMax()` for 10 and 12 bit PWM and ESP8266 with core 2.x (range 1023).
 - **Simple commands:** `forward()`, `backward()`, `turnLeft()`, `turnRight()`, `stop()`, `brake()`; speed from -100 to 100.
 - **Joystick:** `drive(speed, turn)` mixes the left and right sides and scales both down proportionally on overflow.
 - **Bluetooth:** `car.handleStream(bt)` understands F, B, L, R, S, Y (the RC Car mode of the BLE Controller app), W A S D and digits 0-9 as speed.
@@ -221,6 +252,9 @@ void loop() {
 ### Method reference
 | Method | What it does |
 |---|---|
+| `AlashMotor(driver, pinA, pinB, pinC)` | A motor and the driver type: IN_IN_PWM, PWM_PWM or DIR_PWM |
+| `AlashCar(left, right) / addLeft(m) / addRight(m)` | A car of two motors; a second motor per side (4WD) |
+| `AlashMotor::setEnablePin(pin) / setInverted() / setPwmMax()` | The EN or STBY pin, signal inversion, PWM maximum |
 | `AlashCar(AlashCar::PHOBO) / AlashCar(r1,r2,re,l1,l2,le)` | Phobo pins / your own pins |
 | `forward(s) backward(s) turnLeft(s) turnRight(s)` | Movement at speed -100..100 |
 | `stop() / brake()` | Stop coasting / braking |
@@ -245,11 +279,19 @@ Reverse a side: `car.reverseRight()` or `car.reverseLeft()`. If the sides themse
 
 Enable the failsafe: `car.setFailsafe(1000)` and call `car.update()` in loop().
 
+**A motor on an L9110S / DRV8833 does not turn or whines**
+
+These drivers use PWM on both motor pins: both must be PWM pins of the board (3, 5, 6, 9, 10, 11 on Uno). The driver type is `DRIVER_PWM_PWM`. Check the driver power (3-10 V) and the common GND.
+
+**The motor turns at half power or not at full speed**
+
+Check the PWM maximum: most boards use 255, but ESP8266 with core 2.x has a range of 1023, and with `analogWriteResolution(10)` or 12 bit call `car.setPwmMax(1023)` (or 4095). For the BTS7960 and TB6612 give HIGH to the R_EN, L_EN or STBY pins (`setEnablePin()`).
+
 ### Self-check
 The library has `diagnose(Serial)`: it prints what the board sees and tells what to check. Tips language: `setLanguage(LANG_RU / LANG_KK / LANG_EN)`.
 
 ### Examples
-`Basic`, `Bluetooth_AVR`, `Joystick`, `Diagnose`
+`Basic`, `Bluetooth_AVR`, `Joystick`, `Diagnose`, `Driver_L9110`, `FourWheelDrive`
 
 ---
 

@@ -4,36 +4,48 @@
 #define T(ru, kk, en) (_lang == LANG_KK ? F(kk) : _lang == LANG_EN ? F(en) : F(ru))
 
 AlashCar::AlashCar(uint8_t rightIn1, uint8_t rightIn2, uint8_t rightEn, uint8_t leftIn1, uint8_t leftIn2, uint8_t leftEn)
-    : _pr1(rightIn1), _pr2(rightIn2), _pre(rightEn), _pl1(leftIn1), _pl2(leftIn2), _ple(leftEn) {}
+    : _ownL(AlashMotor::DRIVER_IN_IN_PWM, leftIn1, leftIn2, leftEn), _ownR(AlashMotor::DRIVER_IN_IN_PWM, rightIn1, rightIn2, rightEn) {
+  _mL[0] = &_ownL; _nL = 1; _mR[0] = &_ownR; _nR = 1;
+}
 
 // Робот Фобо: L298N, правая сторона IN1=4, IN2=2, ENA=5; левая IN3=8, IN4=12, ENB=6
-AlashCar::AlashCar(Preset) : _pr1(4), _pr2(2), _pre(5), _pl1(8), _pl2(12), _ple(6) {}
+AlashCar::AlashCar(Preset) : AlashCar(4, 2, 5, 8, 12, 6) {}
+
+AlashCar::AlashCar(AlashMotor &left, AlashMotor &right) {
+  _mL[0] = &left; _nL = 1; _mR[0] = &right; _nR = 1;
+}
+
+void AlashCar::addLeft(AlashMotor &m) { if (_nL < 2) _mL[_nL++] = &m; }
+void AlashCar::addRight(AlashMotor &m) { if (_nR < 2) _mR[_nR++] = &m; }
+
+void AlashCar::setPwmMax(uint16_t maxValue) {
+  for (uint8_t i = 0; i < _nL; i++) _mL[i]->setPwmMax(maxValue);
+  for (uint8_t i = 0; i < _nR; i++) _mR[i]->setPwmMax(maxValue);
+}
 
 void AlashCar::begin() {
-  const uint8_t pins[6] = {_pr1, _pr2, _pre, _pl1, _pl2, _ple};
-  for (uint8_t i = 0; i < 6; i++) {
-    digitalWrite(pins[i], LOW);                // сначала «стоп», потом выходы: моторы не дёрнутся при запуске
-    pinMode(pins[i], OUTPUT);
-  }
+  for (uint8_t i = 0; i < _nL; i++) _mL[i]->begin();           // сначала «стоп», потом выходы: моторы не дёрнутся при запуске
+  for (uint8_t i = 0; i < _nR; i++) _mR[i]->begin();
   _started = true;
   _lastCmd = millis();
   _lastRamp = millis();
 }
 
 // Скорость -100..100 одной стороны -> два пина направления и ШИМ. minPwm убирает «мёртвую зону» моторов.
-void AlashCar::apply(uint8_t in1, uint8_t in2, uint8_t en, int8_t speed, bool reversed) {
+void AlashCar::apply(AlashMotor **ms, uint8_t n, int8_t speed, bool reversed) {
   if (reversed) speed = -speed;
-  int pwm = 0;
-  if (speed != 0) {
-    int a = speed < 0 ? -speed : speed;
-    if (a > _limit) a = _limit;
-    pwm = _minPwm + (255 - _minPwm) * a / 100;      // 1 % уже даёт minPwm, 100 % даёт 255
-    if (pwm > 255) pwm = 255;
+  for (uint8_t i = 0; i < n; i++) {
+    int top = ms[i]->pwmMax();
+    int pwm = 0;
+    if (speed != 0) {
+      int a = speed < 0 ? -speed : speed;
+      if (a > _limit) a = _limit;
+      int mn = (int)_minPwm * top / 255;               // минимальный ШИМ задан в шкале 0-255, пересчитываем под разрядность
+      pwm = mn + (top - mn) * a / 100;                 // 1 % уже даёт minPwm, 100 % даёт максимум
+      if (pwm > top) pwm = top;
+    }
+    ms[i]->set(speed < 0 ? -pwm : pwm);
   }
-  if (speed > 0) { digitalWrite(in1, HIGH); digitalWrite(in2, LOW); }
-  else if (speed < 0) { digitalWrite(in1, LOW); digitalWrite(in2, HIGH); }
-  else { digitalWrite(in1, LOW); digitalWrite(in2, LOW); }
-  analogWrite(en, pwm);
 }
 
 void AlashCar::setTargets(int l, int r) {
@@ -44,8 +56,8 @@ void AlashCar::setTargets(int l, int r) {
   _err = ERR_OK;
   if (_ramp == 0) {
     _curL = _tgtL; _curR = _tgtR; _fL = _curL; _fR = _curR;
-    apply(_pl1, _pl2, _ple, _curL, _revL);
-    apply(_pr1, _pr2, _pre, _curR, _revR);
+    apply(_mL, _nL, _curL, _revL);
+    apply(_mR, _nR, _curR, _revR);
   }
 }
 
@@ -59,16 +71,16 @@ void AlashCar::stop() {
   setTargets(0, 0);
   _fL = _fR = 0;
   _curL = _curR = 0;                                      // остановка всегда мгновенная, без плавного снижения
-  apply(_pl1, _pl2, _ple, 0, false);
-  apply(_pr1, _pr2, _pre, 0, false);
+  for (uint8_t i = 0; i < _nL; i++) _mL[i]->coast();
+  for (uint8_t i = 0; i < _nR; i++) _mR[i]->coast();
 }
 
 void AlashCar::brake() {
   setTargets(0, 0);
   _fL = _fR = 0;
   _curL = _curR = 0;
-  digitalWrite(_pl1, HIGH); digitalWrite(_pl2, HIGH); analogWrite(_ple, 255);     // обе ножки моста на HIGH: мотор тормозит
-  digitalWrite(_pr1, HIGH); digitalWrite(_pr2, HIGH); analogWrite(_pre, 255);
+  for (uint8_t i = 0; i < _nL; i++) _mL[i]->brake();                              // замкнуть обмотки: мотор тормозит
+  for (uint8_t i = 0; i < _nR; i++) _mR[i]->brake();
 }
 
 // "Джойстик": левая = speed + turn, правая = speed - turn. Если сумма выходит за 100, обе стороны пропорционально уменьшаются
@@ -129,8 +141,8 @@ void AlashCar::update() {
   float nL = approach(_fL, _tgtL), nR = approach(_fR, _tgtR);
   _fL = nL; _fR = nR;
   int8_t l = (int8_t)(nL + (nL >= 0 ? 0.5f : -0.5f)), r = (int8_t)(nR + (nR >= 0 ? 0.5f : -0.5f));
-  if (l != _curL) { _curL = l; apply(_pl1, _pl2, _ple, _curL, _revL); }
-  if (r != _curR) { _curR = r; apply(_pr1, _pr2, _pre, _curR, _revR); }
+  if (l != _curL) { _curL = l; apply(_mL, _nL, _curL, _revL); }
+  if (r != _curR) { _curR = r; apply(_mR, _nR, _curR, _revR); }
 }
 
 // ---- Диагностика ------------------------------------------------------------------------------------------
@@ -155,7 +167,7 @@ void AlashCar::diagnose(Print &out) {
   tank(0, 70); delay(2000); stop(); delay(500);
   out.println(T("Левая сторона вперёд...", "Сол жақ алға...", "Left side forward..."));
   tank(70, 0); delay(2000); stop();
-  out.println(T("Если сторона вращается назад: reverseRight() или reverseLeft(). Если стороны перепутаны: поменяйте местами тройки пинов в конструкторе. Если не крутится: проверьте питание драйвера (7-12 В), общий GND с платой, перемычки ENA / ENB на L298N (должны быть сняты при управлении ШИМ) и setMinPwm(80) для слабых батарей.",
-                "Бір жақ артқа айналса: reverseRight() не reverseLeft(). Жақтар шатасса: конструкторда пин үштіктерін ауыстырыңыз. Айналмаса: драйвер қуатын (7-12 В), ортақ GND, L298N-дегі ENA / ENB перемычкаларын (ШИМ кезінде алынуы керек) тексеріңіз; әлсіз батарея үшін setMinPwm(80).",
-                "If a side turns backward: reverseRight() or reverseLeft(). If the sides are swapped: swap the pin triples in the constructor. If nothing turns: check the driver power (7-12 V), a common GND with the board, the ENA / ENB jumpers on the L298N (must be removed for PWM control) and setMinPwm(80) for weak batteries."));
+  out.println(T("Если сторона вращается назад: reverseRight() или reverseLeft(). Если стороны перепутаны: поменяйте местами тройки пинов в конструкторе (или левый и правый AlashMotor). Если не крутится: проверьте питание драйвера (7-12 В), общий GND с платой, перемычки ENA / ENB на L298N (должны быть сняты при управлении ШИМ), вывод STBY у TB6612 и R_EN / L_EN у BTS7960 (должны быть HIGH: setEnablePin()), что пины скорости умеют ШИМ, и setMinPwm(80) для слабых батарей. Для L9110S, HG7881 и DRV8833 оба пина мотора должны быть ШИМ-пинами. Если на ESP8266 с ядром 2.x мотор едва вращается, вызовите setPwmMax(1023).",
+                "Бір жақ артқа айналса: reverseRight() не reverseLeft(). Жақтар шатасса: конструкторда пин үштіктерін (немесе сол және оң AlashMotor) ауыстырыңыз. Айналмаса: драйвер қуатын (7-12 В), ортақ GND, L298N-дегі ENA / ENB перемычкаларын (ШИМ кезінде алынуы керек), TB6612-дегі STBY және BTS7960-тағы R_EN / L_EN (HIGH болуы керек: setEnablePin()), жылдамдық пиндерінің ШИМ білуін тексеріңіз; әлсіз батарея үшін setMinPwm(80). L9110S, HG7881 және DRV8833 үшін мотордың екі пині де ШИМ пині болуы керек. ESP8266 2.x ядросында мотор әрең айналса, setPwmMax(1023) шақырыңыз.",
+                "If a side turns backward: reverseRight() or reverseLeft(). If the sides are swapped: swap the pin triples in the constructor (or the left and right AlashMotor). If nothing turns: check the driver power (7-12 V), a common GND with the board, the ENA / ENB jumpers on the L298N (must be removed for PWM control), the STBY pin of a TB6612 and R_EN / L_EN of a BTS7960 (must be HIGH: setEnablePin()), that the speed pins can do PWM, and setMinPwm(80) for weak batteries. For the L9110S, HG7881 and DRV8833 both motor pins must be PWM pins. If on an ESP8266 with core 2.x the motor barely turns, call setPwmMax(1023)."));
 }

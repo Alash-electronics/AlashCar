@@ -1,5 +1,5 @@
 // Тесты AlashCar без железа (уровни пинов и ШИМ записываются имитацией):
-//   g++ -std=c++17 -Wall -I mock -I ../../src test_car.cpp ../../src/AlashCar.cpp && ./a.out
+//   g++ -std=c++17 -Wall -I mock -I ../../src test_car.cpp ../../src/AlashCar.cpp ../../src/AlashMotor.cpp && ./a.out
 #include <stdio.h>
 #include "Arduino.h"
 #include "AlashCar.h"
@@ -85,6 +85,74 @@ int main() {
   reset(); AlashCar d(AlashCar::PHOBO); d.setLanguage(AlashCar::LANG_KK); const char *kk = (const char *)d.errorText();
   d.setLanguage(AlashCar::LANG_EN); d.diagnose(*(new Print));
   CHECK(kk != nullptr && !d.isMoving());
+
+  // ===== Другие драйверы моторов (AlashMotor) =====
+  {
+    // L9110S / HG7881 / DRV8833: два ШИМ-пина на мотор (вперёд, назад)
+    reset(); AlashMotor ml(AlashMotor::DRIVER_PWM_PWM, 14, 15), mr(AlashMotor::DRIVER_PWM_PWM, 16, 17);
+    AlashCar c(ml, mr); c.begin();
+    CHECK(g_pwm[14] == 0 && g_pwm[15] == 0 && g_pwm[16] == 0 && g_pwm[17] == 0);
+    c.forward(100); CHECK(g_pwm[14] == 255 && g_pwm[15] == 0 && g_pwm[16] == 255 && g_pwm[17] == 0);
+    c.backward(50); CHECK(g_pwm[14] == 0 && g_pwm[15] == 127 + 1 - 1 + 0 && g_pwm[17] == g_pwm[15]);     // 50 % от 255 это 127 (целая часть)
+    c.stop(); CHECK(g_pwm[14] == 0 && g_pwm[15] == 0 && g_pwm[16] == 0 && g_pwm[17] == 0);
+    c.brake(); CHECK(g_pwm[14] == 255 && g_pwm[15] == 255 && g_pwm[16] == 255 && g_pwm[17] == 255);       // обе ножки HIGH: торможение
+    c.tank(100, -100); CHECK(g_pwm[14] == 255 && g_pwm[15] == 0 && g_pwm[16] == 0 && g_pwm[17] == 255);
+    c.reverseRight(); c.tank(100, 100); CHECK(g_pwm[14] == 255 && g_pwm[15] == 0 && g_pwm[16] == 0 && g_pwm[17] == 255);   // реверс стороны
+    c.reverseRight(false);
+    c.setMinPwm(80); c.forward(1); CHECK(g_pwm[14] == 80 + (255 - 80) * 1 / 100);                       // minPwm работает и здесь
+  }
+  {
+    // Cytron MD10 и платы DIR + PWM
+    reset(); AlashMotor ml(AlashMotor::DRIVER_DIR_PWM, 18, 19), mr(AlashMotor::DRIVER_DIR_PWM, 20, 21);
+    AlashCar c(ml, mr); c.begin();
+    c.forward(100); CHECK(g_level[18] == 0 && g_pwm[19] == 255 && g_level[20] == 0 && g_pwm[21] == 255);
+    c.backward(100); CHECK(g_level[18] == 1 && g_pwm[19] == 255 && g_level[20] == 1);
+    c.stop(); CHECK(g_pwm[19] == 0 && g_pwm[21] == 0);
+    c.brake(); CHECK(g_pwm[19] == 0);                                                                     // у DIR + PWM торможения нет: просто ноль
+  }
+  {
+    // вывод EN / STBY (TB6612, BTS7960) включается в begin(); активный LOW тоже
+    reset(); AlashMotor m(AlashMotor::DRIVER_PWM_PWM, 22, 23); m.setEnablePin(24, true); AlashMotor n(AlashMotor::DRIVER_PWM_PWM, 25, 26); n.setEnablePin(27, false);
+    AlashCar c(m, n); c.begin(); CHECK(g_level[24] == 1 && g_level[27] == 0);
+    m.enable(false); n.enable(false); CHECK(g_level[24] == 0 && g_level[27] == 1);
+    m.enable(true); CHECK(g_level[24] == 1);
+    AlashMotor free_(AlashMotor::DRIVER_PWM_PWM, 28, 29); free_.enable(true); CHECK(g_level[28] == 0);   // без вывода EN ничего не пишется
+  }
+  {
+    // инверсия сигналов (оптопары): уровни и ШИМ наоборот
+    reset(); AlashMotor ml(AlashMotor::DRIVER_IN_IN_PWM, 30, 31, 32), mr(AlashMotor::DRIVER_IN_IN_PWM, 33, 34, 35); ml.setInverted(true); mr.setInverted(true);
+    AlashCar c(ml, mr); c.begin();
+    CHECK(g_level[30] == 1 && g_level[31] == 1 && g_pwm[32] == 255);                                      // стоп = «всё высоким» при инверсии
+    c.forward(100); CHECK(g_level[30] == 0 && g_level[31] == 1 && g_pwm[32] == 0);                         // полная скорость: IN1 низкий, ШИМ ноль (инвертирован)
+    c.stop(); CHECK(g_level[30] == 1 && g_level[31] == 1 && g_pwm[32] == 255);
+  }
+  {
+    // разрядность ШИМ: 10 бит; minPwm пересчитывается
+    reset(); AlashCar c(4, 2, 5, 8, 12, 6); c.setPwmMax(1023); c.begin();
+    c.forward(100); CHECK(g_pwm[5] == 1023 && g_pwm[6] == 1023);
+    c.setMinPwm(80); c.forward(1); CHECK(g_pwm[5] == 80 * 1023 / 255 + (1023 - 80 * 1023 / 255) * 1 / 100);
+    c.setMinPwm(0); c.forward(50); CHECK(g_pwm[5] == 511);
+    AlashMotor m(AlashMotor::DRIVER_IN_IN_PWM, 1, 2, 3); m.setPwmMax(0); CHECK(m.pwmMax() == 255);          // 0 превращается в 255
+    m.setPwmMax(100); m.set(500); CHECK(m.current() == 100); m.set(-500); CHECK(m.current() == -100);      // ограничивается максимумом
+  }
+  {
+    // четыре мотора: по два на сторону, разные драйверы на сторонах
+    reset(); AlashMotor lf(AlashMotor::DRIVER_IN_IN_PWM, 4, 2, 5), lr(AlashMotor::DRIVER_PWM_PWM, 14, 15), rf(AlashMotor::DRIVER_DIR_PWM, 18, 19), rr(AlashMotor::DRIVER_PWM_PWM, 22, 23);
+    AlashCar c(lf, rf); c.addLeft(lr); c.addRight(rr); c.addLeft(lr); c.addRight(rr);                      // лишние игнорируются (максимум два)
+    c.begin();
+    c.forward(100);
+    CHECK(g_level[4] == 1 && g_pwm[5] == 255 && g_pwm[14] == 255 && g_pwm[15] == 0 && g_level[18] == 0 && g_pwm[19] == 255 && g_pwm[22] == 255);
+    c.turnLeft(100);
+    CHECK(g_level[4] == 0 && g_level[2] == 1 && g_pwm[15] == 255 && g_pwm[14] == 0 && g_level[18] == 0 && g_pwm[22] == 255);   // левые назад, правые вперёд
+    c.stop(); CHECK(g_pwm[5] == 0 && g_pwm[14] == 0 && g_pwm[19] == 0 && g_pwm[22] == 0);
+    c.brake(); CHECK(g_level[4] == 1 && g_level[2] == 1 && g_pwm[14] == 255 && g_pwm[15] == 255 && g_pwm[23] == 255);
+    c.setPwmMax(1023); c.forward(100); CHECK(g_pwm[5] == 1023 && g_pwm[14] == 1023 && g_pwm[19] == 1023);   // setPwmMax действует на все моторы
+  }
+  {
+    // плавный разгон работает с любым драйвером
+    reset(); AlashMotor ml(AlashMotor::DRIVER_PWM_PWM, 14, 15), mr(AlashMotor::DRIVER_PWM_PWM, 16, 17); AlashCar c(ml, mr); c.begin(); c.setRamp(1000);
+    c.forward(100); CHECK(g_pwm[14] == 0); g_ms += 500; c.update(); CHECK(g_pwm[14] > 100 && g_pwm[14] < 160); g_ms += 600; c.update(); CHECK(g_pwm[14] == 255);
+  }
 
   if (fails) { printf("FAILED: %d\n", fails); return 1; }
   printf("ALL TESTS PASSED\n");

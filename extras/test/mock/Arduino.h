@@ -15,11 +15,11 @@ using std::max;
 inline uint32_t g_ms = 1000;
 inline uint32_t millis() { return g_ms; }
 inline void delay(uint32_t ms) { g_ms += ms; }
-inline uint8_t g_level[40], g_pwm[40];
+inline uint8_t g_level[40]; inline int g_pwm[40];
 inline int g_pwmWrites = 0;
 inline void pinMode(uint8_t, uint8_t) {}
 inline void digitalWrite(uint8_t p, uint8_t v) { g_level[p] = v; }
-inline void analogWrite(uint8_t p, int v) { g_pwm[p] = (uint8_t)v; g_pwmWrites++; }
+inline void analogWrite(uint8_t p, int v) { g_pwm[p] = v; g_pwmWrites++; }
 class Print {
  public:
   void print(const char *s) { printf("%s", s); }

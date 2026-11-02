@@ -1,8 +1,8 @@
 {
   "name": "AlashCar",
-  "version": "1.0.1",
-  "description": "Easy robot car library (L298N): forward/turn/drive, smooth ramp, Bluetooth commands, failsafe, clear tips (ru/kk/en), Phobo preset",
-  "keywords": "robot car, L298N, motor driver, Bluetooth, 4WD, RC car, joystick, differential drive, Phobo",
+  "version": "1.1.0",
+  "description": "Robot car library for any motor driver (L298N, TB6612, L9110S, DRV8833, BTS7960, Cytron), 2WD/4WD, ramp, failsafe, Bluetooth commands, tips (ru/kk/en), no dependencies",
+  "keywords": "robot car, L298N, motor driver, Bluetooth, 4WD, RC car, joystick, differential drive, Phobo, L9110S, DRV8833, BTS7960, TB6612, motor driver, 4WD",
   "repository": {
     "type": "git",
     "url": "https://github.com/Alash-electronics/AlashCar"

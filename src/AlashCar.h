@@ -1,9 +1,10 @@
-// AlashCar: машинка на двух драйверах L298N / TB6612 (робот Фобо и подобные): вперёд, назад, повороты, скорость -100..100,
+// AlashCar: машинка на любых драйверах моторов (L298N, TB6612, L9110S, DRV8833, BTS7960, Cytron, ...) с двумя или четырьмя моторами (робот Фобо и подобные): вперёд, назад, повороты, скорость -100..100,
 // плавный разгон, защита при потере связи и разбор команд Bluetooth. Без зависимостей. MIT License. Alash Electronics.
 #ifndef ALASH_CAR_H
 #define ALASH_CAR_H
 
 #include <Arduino.h>
+#include "AlashMotor.h"
 
 class AlashCar {
  public:
@@ -15,6 +16,12 @@ class AlashCar {
   // Для L298N: правая сторона IN1, IN2, ENA; левая IN3, IN4, ENB.
   AlashCar(uint8_t rightIn1, uint8_t rightIn2, uint8_t rightEn, uint8_t leftIn1, uint8_t leftIn2, uint8_t leftEn);
   explicit AlashCar(Preset preset);
+  // Любые драйверы: два мотора (AlashMotor описывает драйвер: L298N, L9110S, DRV8833, BTS7960, Cytron ...). Моторы должны жить столько же, сколько машинка.
+  AlashCar(AlashMotor &left, AlashMotor &right);
+  void addLeft(AlashMotor &m);                 // ещё один мотор на левой стороне (4WD): ведёт себя так же, как первый (до 2 на сторону)
+  void addRight(AlashMotor &m);
+  AlashCar(const AlashCar &) = delete;
+  AlashCar &operator=(const AlashCar &) = delete;
 
   void begin();
 
@@ -31,6 +38,7 @@ class AlashCar {
   // ---- Настройки -----------------------------------------------------------------
   void setSpeedLimit(uint8_t percent) { _limit = percent > 100 ? 100 : percent; }     // не быстрее этого процента (по умолчанию 100)
   void setMinPwm(uint8_t pwm) { _minPwm = pwm; }          // с какого ШИМ (0-255) моторы начинают крутиться (0 = как есть; обычно 60-90)
+  void setPwmMax(uint16_t maxValue);                      // максимум ШИМ для всех моторов (255 по умолчанию; 1023 или 4095 при более точном ШИМ, ESP8266 с ядром 2.x)
   void setRamp(uint16_t ms) { _ramp = ms; }               // время разгона от нуля до максимума, мс (0 = мгновенно)
   void reverseRight(bool on = true) { _revR = on; }       // если правая сторона едет наоборот: вместо перепайки
   void reverseLeft(bool on = true) { _revL = on; }
@@ -54,7 +62,9 @@ class AlashCar {
   void diagnose(Print &out);                 // по очереди крутит каждую сторону вперёд: проверьте направление и подключение
 
  private:
-  uint8_t _pr1, _pr2, _pre, _pl1, _pl2, _ple;
+  AlashMotor _ownL, _ownR;                       // моторы, созданные конструктором с пинами
+  AlashMotor *_mL[2] = {nullptr, nullptr}, *_mR[2] = {nullptr, nullptr};
+  uint8_t _nL = 0, _nR = 0;
   bool _started = false, _revR = false, _revL = false, _wasd = false;
   uint8_t _limit = 100, _minPwm = 0;
   uint16_t _ramp = 0, _failsafe = 0;
@@ -66,7 +76,7 @@ class AlashCar {
   Language _lang = LANG_RU;
 
   void setTargets(int l, int r);
-  void apply(uint8_t in1, uint8_t in2, uint8_t en, int8_t speed, bool reversed);
+  void apply(AlashMotor **ms, uint8_t n, int8_t speed, bool reversed);
   static int8_t clamp(int v) { return v > 100 ? 100 : v < -100 ? -100 : (int8_t)v; }
 };
 

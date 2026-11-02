@@ -1,6 +1,6 @@
 {
   "name": "AlashCar",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Easy robot car library (L298N): forward/turn/drive, smooth ramp, Bluetooth commands, failsafe, clear tips (ru/kk/en), Phobo preset",
   "keywords": "robot car, L298N, motor driver, Bluetooth, 4WD, RC car, joystick, differential drive, Phobo",
   "repository": {

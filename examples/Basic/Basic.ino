@@ -1,8 +1,18 @@
-// AlashCar: самый простой пример. Машинка едет вперёд, назад и поворачивает. Для робота Фобо (Alash Electronics) и любой машинки на L298N.
+// [ru] AlashCar: самый простой пример. Машинка едет вперёд, назад и поворачивает. Для робота Фобо (Alash Electronics) и любой машинки на L298N.
 //
-// Поднимите машинку колёсами в воздух при первом запуске! Подключение L298N (для Uno):
-//   правая сторона: IN1 -> D4, IN2 -> D2, ENA -> D5;  левая сторона: IN3 -> D8, IN4 -> D12, ENB -> D6.
-//   Питание драйвера 7-12 В (две батареи 18650), общий GND с платой. Перемычки ENA / ENB на L298N сняты.
+//      Поднимите машинку колёсами в воздух при первом запуске! Подключение L298N (для Uno):
+//        правая сторона: IN1 -> D4, IN2 -> D2, ENA -> D5;  левая сторона: IN3 -> D8, IN4 -> D12, ENB -> D6.
+//        Питание драйвера 7-12 В (две батареи 18650), общий GND с платой. Перемычки ENA / ENB на L298N сняты.
+// [kk] AlashCar: ең қарапайым мысал. Машина алға, артқа жүреді және бұрылады. Фобо роботы (Alash Electronics) және L298N-дегі кез келген машина үшін.
+//
+//      Бірінші іске қосуда машинаны дөңгелектерін ауаға көтеріңіз! L298N қосу (Uno үшін):
+//        оң жағы: IN1 -> D4, IN2 -> D2, ENA -> D5;  сол жағы: IN3 -> D8, IN4 -> D12, ENB -> D6.
+//        Драйвер қуаты 7-12 В (екі 18650 батарея), тақтамен ортақ GND. L298N-дегі ENA / ENB перемычкалары алынған.
+// [en] AlashCar: the simplest example. The car drives forward, backward and turns. For the Phobo robot (Alash Electronics) and any car on an L298N.
+//
+//      Lift the car with its wheels in the air on the first run! L298N wiring (for Uno):
+//        right side: IN1 -> D4, IN2 -> D2, ENA -> D5;  left side: IN3 -> D8, IN4 -> D12, ENB -> D6.
+//        Driver power 7-12 V (two 18650 batteries), common GND with the board. The ENA / ENB jumpers on the L298N are removed.
 #include <AlashCar.h>
 
 #if defined(ESP32)
